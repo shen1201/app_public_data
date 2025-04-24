@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>低收、中低收入戶數據整理工具</title>
+  <title>低收、中低收入戶資料處理工具</title>
   <!-- SheetJS -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <style>
@@ -92,6 +92,11 @@
       color: #721c24;
       border: 1px solid #f5c6cb;
     }
+    .status.warning {
+      background-color: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeeba;
+    }
     .file-selected {
       margin-top: 5px;
       font-size: 14px;
@@ -133,6 +138,14 @@
     .data-source a:hover {
       text-decoration: underline;
     }
+    .note {
+      margin-top: 15px;
+      padding: 10px 15px;
+      background-color: #e7f3fe;
+      border-left: 4px solid #3498db;
+      color: #555;
+      font-size: 14px;
+    }
     @media (max-width: 600px) {
       .form-row {
         flex-direction: column;
@@ -143,7 +156,11 @@
 </head>
 <body>
   <div class="container">
-    <h1>低收、中低收入戶數據整理工具</h1>
+    <h1>低收、中低收入戶資料處理工具</h1>
+    
+    <div class="note">
+      <strong>注意：</strong>此工具僅能處理2015年以後的統計資料。
+    </div>
     
     <div class="form-group">
       <label for="fileInput">選擇 Excel 檔案</label>
@@ -154,8 +171,8 @@
     <div class="form-row">
       <div class="form-col">
         <div class="form-group">
-          <label for="yearInput">年份</label>
-          <input type="number" id="yearInput" value="2024" min="2000" max="2100" />
+          <label for="yearInput">年份 (2015~)</label>
+          <input type="number" id="yearInput" value="2024" min="2015" />
         </div>
       </div>
       <div class="form-col">
@@ -189,11 +206,20 @@
     <div class="status" id="statusMessage"></div>
     
     <div class="data-source">
-      <p>資料來源：<a href="https://dep.mohw.gov.tw/DOS/cp-5337-62357-113.html#_0.%E4%BA%BA%E5%8F%A3" target="_blank">社會福利公務統計一覽表 - 統計處</a></p>
+      <p>資料來源：<a href="https://dep-statistics.moi.gov.tw/singlehtml/3501" target="_blank">社會福利公務統計一覽表 - 統計處</a></p>
     </div>
   </div>
 
   <script>
+    // 年份範圍驗證
+    const yearInput = document.getElementById('yearInput');
+    yearInput.addEventListener('change', function() {
+      if (this.value < 2015) {
+        this.value = 2015;
+        showStatus('僅支援2015年後的資料', 'warning');
+      } 
+    });
+    
     // 顯示已選擇的檔案名稱
     document.getElementById('fileInput').addEventListener('change', function(e) {
       const fileName = e.target.files[0] ? e.target.files[0].name : '';
@@ -209,6 +235,12 @@
       const statusMsg = document.getElementById('statusMessage');
       const progressContainer = document.getElementById('progressContainer');
       const progressBar = document.getElementById('progressBar');
+      
+      // 檢查年份
+      if (year < 2015) {
+        showStatus('請選擇2015年或之後的年份', 'error');
+        return;
+      }
       
       // 重置狀態
       statusMsg.style.display = 'none';

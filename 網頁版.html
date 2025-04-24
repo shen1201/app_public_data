@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>低收入戶資料篩選工具</title>
+  <!-- SheetJS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <h1>低收入戶資料篩選工具</h1>
+
+  <label for="fileInput">選擇 Excel 檔案：</label>
+  <input type="file" id="fileInput" accept=".xlsx" /><br/><br/>
+
+  <label for="yearInput">輸入年份 (e.g. 2024)：</label>
+  <input type="number" id="yearInput" value="2024" /><br/><br/>
+
+  <label for="seasonSelect">選擇季度：</label>
+  <select id="seasonSelect">
+    <option value="Q1">Q1</option>
+    <option value="Q2">Q2</option>
+    <option value="Q3">Q3</option>
+    <option value="Q4">Q4</option>
+  </select><br/><br/>
+
+  <label for="incomeTypeSelect">資料類型：</label>
+  <select id="incomeTypeSelect">
+    <option value="lowincome">lowincome</option>
+    <option value="midincome">midincome</option>
+  </select><br/><br/>
+
+  <button id="processBtn">開始篩選並下載 CSV</button>
+
+  <script>
+    document.getElementById('processBtn').addEventListener('click', () => {
+      const fileInput = document.getElementById('fileInput');
+      const year = document.getElementById('yearInput').value;
+      const season = document.getElementById('seasonSelect').value;
+      const incomeType = document.getElementById('incomeTypeSelect').value;
+      
+      if (!fileInput.files.length) {
+        alert('請先選擇一個 .xlsx 檔案'); return;
+      }
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = year.toString();
+        if (!workbook.Sheets[sheetName]) { alert('找不到工作表: ' + sheetName); return; }
+        const ws = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false });
+        // 找到第一行 A 欄包含 season
+        let startIdx = rows.findIndex(r => r[0] && r[0].toString().includes(season));
+        if (startIdx < 0) { alert('找不到包含 ' + season + ' 的列'); return; }
+        const localities = [
+          "新北市","臺北市","桃園市","臺中市","臺南市","高雄市",
+          "宜蘭縣","新竹縣","苗栗縣","彰化縣","南投縣","雲林縣",
+          "嘉義縣","屏東縣","臺東縣","花蓮縣","澎湖縣","基隆市",
+          "新竹市","嘉義市","金門縣","連江縣"
+        ];
+        const result = [];
+        for (let i = startIdx + 1; i < rows.length && result.length < localities.length; i++) {
+          const cell = rows[i][0] ? rows[i][0].toString() : '';
+          if (localities.some(loc => cell.includes(loc))) {
+            // 取 A,C,D,E,F,G,H => index 0,2,3,4,5,6,7
+            const row = rows[i];
+            // 移除逗號、空白並清理資料
+            const cleanedRow = [
+              (row[0] || '').trim(),
+              (row[2] || '').replace(/,|\s/g, ''),
+              (row[3] || '').replace(/,|\s/g, ''),
+              (row[4] || '').replace(/,|\s/g, ''),
+              (row[5] || '').replace(/,|\s/g, ''),
+              (row[6] || '').replace(/,|\s/g, ''),
+              (row[7] || '').replace(/,|\s/g, '')
+            ];
+            result.push(cleanedRow);
+          }
+        }
+        if (result.length < localities.length) {
+          alert('只找到 ' + result.length + ' 筆資料');
+        }
+        // 轉成 CSV，不加額外的引號
+        let csv = result.map(r => r.join(',')).join('\r\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${year}_${season}_${incomeType}.csv`;
+        link.click();
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>低收、中低收入戶數據整理工具</title>
+  <!-- SheetJS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    body {
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f7fa;
+      color: #333;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+      margin-bottom: 30px;
+      border-bottom: 2px solid #eaeaea;
+      padding-bottom: 15px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #555;
+    }
+    input[type="file"],
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+    input[type="file"] {
+      padding: 10px;
+      background-color: #f9f9f9;
+    }
+    input:focus,
+    select:focus {
+      outline: none;
+      border-color: #3498db;
+    }
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 14px 24px;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    .status {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 6px;
+      display: none;
+    }
+    .status.success {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .status.error {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .file-selected {
+      margin-top: 5px;
+      font-size: 14px;
+      color: #666;
+    }
+    .file-icon {
+      margin-right: 8px;
+      color: #3498db;
+    }
+    .progress-container {
+      margin-top: 20px;
+      display: none;
+    }
+    progress {
+      width: 100%;
+      height: 10px;
+      border-radius: 5px;
+    }
+    .form-row {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    .form-col {
+      flex: 1;
+    }
+    .data-source {
+      margin-top: 30px;
+      padding-top: 15px;
+      border-top: 1px solid #eaeaea;
+      font-size: 14px;
+      color: #666;
+      text-align: center;
+    }
+    .data-source a {
+      color: #3498db;
+      text-decoration: none;
+    }
+    .data-source a:hover {
+      text-decoration: underline;
+    }
+    @media (max-width: 600px) {
+      .form-row {
+        flex-direction: column;
+        gap: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>低收、中低收入戶數據整理工具</h1>
+    
+    <div class="form-group">
+      <label for="fileInput">選擇 Excel 檔案</label>
+      <input type="file" id="fileInput" accept=".xlsx" />
+      <div class="file-selected" id="fileSelected"></div>
+    </div>
+    
+    <div class="form-row">
+      <div class="form-col">
+        <div class="form-group">
+          <label for="yearInput">年份</label>
+          <input type="number" id="yearInput" value="2024" min="2000" max="2100" />
+        </div>
+      </div>
+      <div class="form-col">
+        <div class="form-group">
+          <label for="seasonSelect">季度</label>
+          <select id="seasonSelect">
+            <option value="Q1">第一季 (Q1)</option>
+            <option value="Q2">第二季 (Q2)</option>
+            <option value="Q3">第三季 (Q3)</option>
+            <option value="Q4">第四季 (Q4)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-col">
+        <div class="form-group">
+          <label for="incomeTypeSelect">資料類型</label>
+          <select id="incomeTypeSelect">
+            <option value="lowincome">低收入戶</option>
+            <option value="midincome">中低收入戶</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    
+    <button id="processBtn">開始篩選並下載 CSV</button>
+    
+    <div class="progress-container" id="progressContainer">
+      <progress id="progressBar" max="100" value="0"></progress>
+    </div>
+    
+    <div class="status" id="statusMessage"></div>
+    
+    <div class="data-source">
+      <p>資料來源：<a href="https://dep.mohw.gov.tw/DOS/cp-5337-62357-113.html#_0.%E4%BA%BA%E5%8F%A3" target="_blank">社會福利公務統計一覽表 - 統計處</a></p>
+    </div>
+  </div>
+
+  <script>
+    // 顯示已選擇的檔案名稱
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const fileName = e.target.files[0] ? e.target.files[0].name : '';
+      document.getElementById('fileSelected').innerHTML = fileName ? 
+        `<span class="file-icon">📄</span>${fileName}` : '';
+    });
+
+    document.getElementById('processBtn').addEventListener('click', () => {
+      const fileInput = document.getElementById('fileInput');
+      const year = document.getElementById('yearInput').value;
+      const season = document.getElementById('seasonSelect').value;
+      const incomeType = document.getElementById('incomeTypeSelect').value;
+      const statusMsg = document.getElementById('statusMessage');
+      const progressContainer = document.getElementById('progressContainer');
+      const progressBar = document.getElementById('progressBar');
+      
+      // 重置狀態
+      statusMsg.style.display = 'none';
+      statusMsg.innerHTML = '';
+      statusMsg.className = 'status';
+      
+      if (!fileInput.files.length) {
+        showStatus('請先選擇一個 .xlsx 檔案', 'error');
+        return;
+      }
+      
+      // 顯示進度條
+      progressContainer.style.display = 'block';
+      progressBar.value = 10;
+      
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        try {
+          progressBar.value = 30;
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          progressBar.value = 50;
+          
+          const sheetName = year.toString();
+          if (!workbook.Sheets[sheetName]) {
+            showStatus(`找不到工作表: ${sheetName}`, 'error');
+            progressContainer.style.display = 'none';
+            return;
+          }
+          
+          const ws = workbook.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false });
+          progressBar.value = 60;
+          
+          // 找到第一行 A 欄包含 season
+          let startIdx = rows.findIndex(r => r[0] && r[0].toString().includes(season));
+          if (startIdx < 0) {
+            showStatus(`找不到包含 ${season} 的列`, 'error');
+            progressContainer.style.display = 'none';
+            return;
+          }
+          
+          const localities = [
+            "新北市","臺北市","桃園市","臺中市","臺南市","高雄市",
+            "宜蘭縣","新竹縣","苗栗縣","彰化縣","南投縣","雲林縣",
+            "嘉義縣","屏東縣","臺東縣","花蓮縣","澎湖縣","基隆市",
+            "新竹市","嘉義市","金門縣","連江縣"
+          ];
+          
+          const result = [];
+          for (let i = startIdx + 1; i < rows.length && result.length < localities.length; i++) {
+            const cell = rows[i][0] ? rows[i][0].toString() : '';
+            if (localities.some(loc => cell.includes(loc))) {
+              // 取 A,C,D,E,F,G,H => index 0,2,3,4,5,6,7
+              const row = rows[i];
+              // 移除逗號、空白並清理資料
+              const cleanedRow = [
+                (row[0] || '').trim(),
+                (row[2] || '').replace(/,|\s/g, ''),
+                (row[3] || '').replace(/,|\s/g, ''),
+                (row[4] || '').replace(/,|\s/g, ''),
+                (row[5] || '').replace(/,|\s/g, ''),
+                (row[6] || '').replace(/,|\s/g, ''),
+                (row[7] || '').replace(/,|\s/g, '')
+              ];
+              result.push(cleanedRow);
+            }
+          }
+          
+          progressBar.value = 80;
+          
+          if (result.length === 0) {
+            showStatus('找不到任何符合條件的資料', 'error');
+            progressContainer.style.display = 'none';
+            return;
+          }
+          
+          if (result.length < localities.length) {
+            showStatus(`注意：只找到 ${result.length} 筆資料（共 ${localities.length} 個地區）`, 'warning');
+          }
+          
+          // 轉成 CSV，不加額外的引號
+          let csv = result.map(r => r.join(',')).join('\r\n');
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = `${year}_${season}_${incomeType}.csv`;
+          
+          progressBar.value = 100;
+          
+          link.click();
+          showStatus(`成功！已下載檔案 ${year}_${season}_${incomeType}.csv`, 'success');
+          
+          // 3秒後隱藏進度條
+          setTimeout(() => {
+            progressContainer.style.display = 'none';
+            progressBar.value = 0;
+          }, 3000);
+          
+        } catch (error) {
+          showStatus(`處理檔案時發生錯誤：${error.message}`, 'error');
+          progressContainer.style.display = 'none';
+        }
+      };
+      
+      reader.onerror = () => {
+        showStatus('讀取檔案時發生錯誤', 'error');
+        progressContainer.style.display = 'none';
+      };
+      
+      reader.readAsArrayBuffer(file);
+    });
+    
+    function showStatus(message, type) {
+      const statusMsg = document.getElementById('statusMessage');
+      statusMsg.textContent = message;
+      statusMsg.className = `status ${type}`;
+      statusMsg.style.display = 'block';
+    }
+  </script>
+</body>
+</html>
